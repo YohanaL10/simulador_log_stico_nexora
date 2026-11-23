@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexora Ops | Simulador Logístico y Análisis de Cuellos de Botella</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    /* Estilos personalizados para sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border-radius: 9999px;
+      background: #cbd5e1;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #2563eb;
+      cursor: pointer;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.45);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+      background: #1d4ed8;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #2563eb;
+      cursor: pointer;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.45);
+    }
+
+    .bar-transition {
+      transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.25s ease;
+    }
+
+    .reference-line-transition {
+      transition: left 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Barra Superior Corporativa -->
+  <header class="bg-slate-900 text-white shadow-md border-b border-slate-800 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-inner">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg sm:text-xl font-bold tracking-tight">NEXORA <span class="text-blue-400 font-semibold">Logistics Twin</span></h1>
+            <span class="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+              Ingeniería de Operaciones
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Simulador de Capacidad Secuencial, Cuellos de Botella y Coste Incremental</p>
+        </div>
+      </div>
+
+      <!-- Botones rápidos de escenario -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btn-base" type="button"
+          class="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer">
+          Restaurar Base (6.000)
+        </button>
+        <button id="btn-optimal" type="button"
+          class="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/50 transition flex items-center gap-1.5 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Cargar Escenario Óptimo (9.000 ped/día)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Alerta Dinámica de Estado del Sistema / Cuello de Botella -->
+    <section id="status-banner" class="rounded-2xl border p-4 sm:p-5 shadow-sm transition-colors duration-300 bg-emerald-50 border-emerald-200">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div class="flex items-start gap-3.5">
+          <div id="status-icon-wrap" class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-emerald-600 text-white shadow-sm">
+            <svg id="status-icon" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="status-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-600 text-white">
+                Capacidad Suficiente
+              </span>
+              <span class="text-xs font-medium text-slate-500">
+                Cuello de botella activo: <strong id="bottleneck-name" class="text-slate-900">Preparación (Picking)</strong>
+              </span>
+            </div>
+            <h2 id="status-title" class="text-base sm:text-lg font-bold text-slate-900 mt-1">
+              El sistema cubre la demanda objetivo de 6.000 ped/día con holgura operativa.
+            </h2>
+            <p id="status-subtitle" class="text-xs sm:text-sm text-slate-600 mt-0.5">
+              Capacidad efectiva del sistema: <strong id="effective-cap-text">6.300 ped/día</strong> (superávit de <strong id="balance-text">+300 ped/día</strong>).
+            </p>
+          </div>
+        </div>
+
+        <!-- Resumen rápido derecha del banner -->
+        <div class="flex items-center gap-4 bg-white/80 backdrop-blur-sm rounded-xl px-4 py-3 border border-slate-200/80 shrink-0">
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Capacidad Efectiva</div>
+            <div id="banner-eff-cap" class="text-xl font-extrabold text-slate-900">6.300 <span class="text-xs font-normal text-slate-500">ped/día</span></div>
+          </div>
+          <div class="h-8 w-px bg-slate-200"></div>
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Demanda Objetivo</div>
+            <div id="banner-demand" class="text-xl font-extrabold text-blue-600">6.000 <span class="text-xs font-normal text-slate-500">ped/día</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grid Principal: Controles (Izquierda) + Visualización y Finanzas (Derecha) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- COLUMNA IZQUIERDA: Panel de Controles Interactivos -->
+      <aside class="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-6">
+        <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Parámetros de Simulación</h3>
+            <p class="text-xs text-slate-500">Ajusta demanda, plantilla e inversiones estratégicas</p>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">30 días/mes</span>
+        </div>
+
+        <!-- Slider 1: Crecimiento de Demanda -->
+        <div class="space-y-2.5 bg-slate-50 p-4 rounded-xl border border-slate-200/70">
+          <div class="flex items-center justify-between">
+            <label for="slider-demand" class="text-sm font-semibold text-slate-800">
+              Crecimiento de Demanda
+            </label>
+            <div class="text-right">
+              <span id="demand-pct-label" class="inline-block px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold text-xs">
+                +0%
+              </span>
+              <span id="demand-vol-label" class="ml-1.5 text-sm font-extrabold text-slate-900">
+                6.000 ped/día
+              </span>
+            </div>
+          </div>
+          <input id="slider-demand" type="range" min="0" max="100" step="5" value="0" class="w-full" />
+          <div class="flex justify-between text-[11px] font-medium text-slate-400">
+            <span>Base: 0% (6.000)</span>
+            <span class="text-blue-600 font-semibold">+50% (9.000)</span>
+            <span>+100% (12.000)</span>
+          </div>
+        </div>
+
+        <!-- Slider 2: Operarios Adicionales -->
+        <div class="space-y-2.5 bg-slate-50 p-4 rounded-xl border border-slate-200/70">
+          <div class="flex items-center justify-between">
+            <label for="slider-workers" class="text-sm font-semibold text-slate-800">
+              Operarios Adicionales (Preparación)
+            </label>
+            <div class="text-right">
+              <span id="workers-add-label" class="inline-block px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-bold text-xs">
+                +0 op.
+              </span>
+              <span id="workers-total-label" class="ml-1.5 text-sm font-extrabold text-slate-900">
+                Total: 60
+              </span>
+            </div>
+          </div>
+          <input id="slider-workers" type="range" min="0" max="60" step="1" value="0" class="w-full" />
+          <div class="flex justify-between text-[11px] text-slate-500">
+            <span>Base: 60 operarios</span>
+            <span>Coste: <strong class="text-slate-700">2.200 €/mes</strong> por operario</span>
+          </div>
+        </div>
+
+        <!-- Checkboxes de Inversiones -->
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Palancas de Inversión y Expansión</h4>
+
+          <!-- Checkbox 1: Inversión Tecnológica -->
+          <label for="chk-tech" class="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 transition cursor-pointer select-none">
+            <input id="chk-tech" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-bold text-slate-900">Inversión Tecnológica (WMS / Picking)</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 shrink-0">15.000 €/mes</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">
+                Incrementa un <strong>+30%</strong> la productividad en Preparación: pasa de 15 a <strong>19,5 ped/h</strong> (136,5 ped/día por operario).
+              </p>
+            </div>
+          </label>
+
+          <!-- Checkbox 2: Ampliación de Instalaciones -->
+          <label for="chk-expansion" class="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 transition cursor-pointer select-none">
+            <input id="chk-expansion" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-bold text-slate-900">Ampliación de Instalaciones</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 shrink-0">20.000 €/mes</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">
+                Eleva el techo operativo de <strong>Empaquetado</strong> (de 7.000 a 10.000 ped/día) y <strong>Expedición</strong> (de 8.000 a 10.000 ped/día).
+              </p>
+            </div>
+          </label>
+
+          <!-- Checkbox 3: Segundo Almacén -->
+          <label for="chk-warehouse" class="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 transition cursor-pointer select-none">
+            <input id="chk-warehouse" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-bold text-slate-900">Segundo Almacén Satélite</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 shrink-0">35.000 €/mes</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">
+                Añade un flujo paralelo integral de <strong>+3.500 ped/día</strong> sumados directamente a la capacidad de Preparación, Empaquetado y Expedición.
+              </p>
+            </div>
+          </label>
+        </div>
+      </aside>
+
+      <!-- COLUMNA DERECHA: Gráficos de Capacidad + Métricas Financieras -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Tarjeta de Gráficos de Barras Comparativos por Proceso -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4 mb-5">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Capacidad vs. Demanda por Proceso Secuencial</h3>
+              <p class="text-xs text-slate-500">La línea discontinua vertical marca la demanda objetivo diaria</p>
+            </div>
+            <!-- Leyenda de colores -->
+            <div class="flex flex-wrap items-center gap-3 text-xs font-medium">
+              <span class="flex items-center gap-1.5 text-slate-600">
+                <span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span> Cubre demanda
+              </span>
+              <span class="flex items-center gap-1.5 text-slate-600">
+                <span class="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span> Cuello de botella (cubre)
+              </span>
+              <span class="flex items-center gap-1.5 text-slate-600">
+                <span class="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span> Déficit (insuficiente)
+              </span>
+            </div>
+          </div>
+
+          <!-- Contenedor de Barras -->
+          <div class="space-y-6">
+
+            <!-- Proceso 1: Preparación -->
+            <div class="space-y-1.5">
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-slate-900">1. Preparación (Picking)</span>
+                  <span id="tag-prep" class="hidden px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide"></span>
+                </div>
+                <div class="text-xs sm:text-sm font-semibold text-slate-700">
+                  <span id="val-prep" class="font-extrabold text-slate-900">6.300</span> / <span class="demand-ref-text">6.000</span> ped/día
+                  <span id="diff-prep" class="ml-1 text-xs font-bold text-emerald-600">(+300)</span>
+                </div>
+              </div>
+              <div class="relative h-8 bg-slate-100 rounded-xl overflow-hidden border border-slate-200/80">
+                <div id="bar-prep" class="bar-transition h-full bg-emerald-500 rounded-r-lg flex items-center px-3 text-xs font-bold text-white" style="width: 45%;">
+                  <span id="bar-prep-label">6.300</span>
+                </div>
+                <!-- Línea de referencia Demanda -->
+                <div id="ref-line-1" class="reference-line-transition absolute top-0 bottom-0 w-0.5 bg-slate-900 z-10" style="left: 42.8%;">
+                  <div class="w-2 h-2 rounded-full bg-slate-900 -ml-[3px] -mt-0.5"></div>
+                </div>
+              </div>
+              <p id="formula-prep" class="text-[11px] text-slate-500">
+                60 operarios × 15,0 ped/h × 7 h/día = 6.300 ped/día
+              </p>
+            </div>
+
+            <!-- Proceso 2: Empaquetado -->
+            <div class="space-y-1.5">
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-slate-900">2. Empaquetado (Packing)</span>
+                  <span id="tag-pack" class="hidden px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide"></span>
+                </div>
+                <div class="text-xs sm:text-sm font-semibold text-slate-700">
+                  <span id="val-pack" class="font-extrabold text-slate-900">7.000</span> / <span class="demand-ref-text">6.000</span> ped/día
+                  <span id="diff-pack" class="ml-1 text-xs font-bold text-emerald-600">(+1.000)</span>
+                </div>
+              </div>
+              <div class="relative h-8 bg-slate-100 rounded-xl overflow-hidden border border-slate-200/80">
+                <div id="bar-pack" class="bar-transition h-full bg-emerald-500 rounded-r-lg flex items-center px-3 text-xs font-bold text-white" style="width: 50%;">
+                  <span id="bar-pack-label">7.000</span>
+                </div>
+                <!-- Línea de referencia Demanda -->
+                <div id="ref-line-2" class="reference-line-transition absolute top-0 bottom-0 w-0.5 bg-slate-900 z-10" style="left: 42.8%;">
+                  <div class="w-2 h-2 rounded-full bg-slate-900 -ml-[3px] -mt-0.5"></div>
+                </div>
+              </div>
+              <p id="formula-pack" class="text-[11px] text-slate-500">
+                Capacidad instalada base = 7.000 ped/día
+              </p>
+            </div>
+
+            <!-- Proceso 3: Expedición -->
+            <div class="space-y-1.5">
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-slate-900">3. Expedición (Shipping)</span>
+                  <span id="tag-ship" class="hidden px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide"></span>
+                </div>
+                <div class="text-xs sm:text-sm font-semibold text-slate-700">
+                  <span id="val-ship" class="font-extrabold text-slate-900">8.000</span> / <span class="demand-ref-text">6.000</span> ped/día
+                  <span id="diff-ship" class="ml-1 text-xs font-bold text-emerald-600">(+2.000)</span>
+                </div>
+              </div>
+              <div class="relative h-8 bg-slate-100 rounded-xl overflow-hidden border border-slate-200/80">
+                <div id="bar-ship" class="bar-transition h-full bg-emerald-500 rounded-r-lg flex items-center px-3 text-xs font-bold text-white" style="width: 57.1%;">
+                  <span id="bar-ship-label">8.000</span>
+                </div>
+                <!-- Línea de referencia Demanda -->
+                <div id="ref-line-3" class="reference-line-transition absolute top-0 bottom-0 w-0.5 bg-slate-900 z-10" style="left: 42.8%;">
+                  <div class="w-2 h-2 rounded-full bg-slate-900 -ml-[3px] -mt-0.5"></div>
+                </div>
+              </div>
+              <p id="formula-ship" class="text-[11px] text-slate-500">
+                Capacidad instalada base = 8.000 ped/día
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Escala eje X -->
+          <div class="mt-4 pt-2 border-t border-slate-100 flex justify-between text-[11px] font-medium text-slate-400">
+            <span>0 ped/día</span>
+            <span>3.500</span>
+            <span>7.000</span>
+            <span>10.500</span>
+            <span>14.000+</span>
+          </div>
+        </section>
+
+        <!-- Tarjetas de Impacto Económico y Coste Unitario -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+          <!-- KPI 1: Coste Adicional Mensual -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Coste Adicional Mensual</span>
+                <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </span>
+              </div>
+              <div id="kpi-monthly-cost" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+                0 €
+              </div>
+            </div>
+            <div id="kpi-cost-breakdown" class="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 space-y-1">
+              Sin costes adicionales sobre la operación base.
+            </div>
+          </div>
+
+          <!-- KPI 2: Coste Adicional por Pedido Total -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Sobrecoste / Pedido Total</span>
+                <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </span>
+              </div>
+              <div id="kpi-cost-per-total-order" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+                0,00 €
+              </div>
+            </div>
+            <p class="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+              Coste mensual adicional repartido entre todos los pedidos demandados (<span id="monthly-total-orders-text">180.000</span> ped/mes).
+            </p>
+          </div>
+
+          <!-- KPI 3: Coste Marginal por Pedido Extra -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Coste Marginal / Ped. Extra</span>
+                <span class="p-1.5 rounded-lg bg-purple-50 text-purple-600">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </span>
+              </div>
+              <div id="kpi-cost-per-extra-order" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+                —
+              </div>
+            </div>
+            <p class="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+              Coste mensual adicional dividido entre los pedidos incrementales sobre la base (<span id="monthly-extra-orders-text">0</span> ped/mes extra).
+            </p>
+          </div>
+
+        </section>
+
+        <!-- Panel Explicativo del Modelo Matemático -->
+        <section class="bg-slate-800 text-slate-200 rounded-2xl p-5 shadow-sm border border-slate-700">
+          <div class="flex items-center gap-2 mb-3">
+            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h4 class="text-sm font-bold text-white uppercase tracking-wider">Formulación Matemática Aplicada</h4>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-300 leading-relaxed">
+            <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/70">
+              <strong class="text-blue-300 block mb-1">Capacidad Secuencial del Sistema:</strong>
+              <code>Cap_Prep = (60 + ΔOp) × (15 × Factor_Tec) × 7 + Cap_Alm2</code><br/>
+              <code>Cap_Emp = (Ampliación ? 10.000 : 7.000) + Cap_Alm2</code><br/>
+              <code>Cap_Exp = (Ampliación ? 10.000 : 8.000) + Cap_Alm2</code><br/>
+              <code>Cap_Efectiva = min(Cap_Prep, Cap_Emp, Cap_Exp)</code>
+            </div>
+            <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/70">
+              <strong class="text-emerald-300 block mb-1">Estructura de Costes Incrementales:</strong>
+              <code>ΔCoste_Mes = (ΔOp × 2.200€) + C_Tec + C_Amp + C_Alm2</code><br/>
+              <code>Sobrecoste_Total = ΔCoste_Mes / (Demanda_Día × 30)</code><br/>
+              <code>Coste_Marginal = ΔCoste_Mes / ((Demanda_Día - 6.000) × 30)</code>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Pie de página -->
+  <footer class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-xs text-slate-400">
+    Nexora Ingeniería de Operaciones · Modelo de Simulación de Capacidad Logística y Análisis Coste-Volumen
+  </footer>
+
+  <!-- Lógica de Simulación en Tiempo Real -->
+  <script>
+    // Parámetros constantes del modelo de Nexora
+    const MODEL_CONSTANTS = {
+      BASE_DEMAND: 6000,
+      BASE_WORKERS: 60,
+      BASE_PRODUCTIVITY_PER_HOUR: 15,
+      HOURS_PER_DAY: 7,
+      TECH_MULTIPLIER: 1.30,
+      BASE_PACKING_CAP: 7000,
+      EXPANDED_PACKING_CAP: 10000,
+      BASE_SHIPPING_CAP: 8000,
+      EXPANDED_SHIPPING_CAP: 10000,
+      SECOND_WAREHOUSE_CAP: 3500,
+      COST_PER_WORKER: 2200,
+      COST_TECH: 15000,
+      COST_EXPANSION: 20000,
+      COST_SECOND_WAREHOUSE: 35000,
+      DAYS_PER_MONTH: 30,
+      CHART_MAX_SCALE: 14000 // Escala máxima fija para comparar visualmente con claridad
+    };
+
+    // Referencias a elementos del DOM
+    const dom = {
+      sliderDemand: document.getElementById('slider-demand'),
+      sliderWorkers: document.getElementById('slider-workers'),
+      chkTech: document.getElementById('chk-tech'),
+      chkExpansion: document.getElementById('chk-expansion'),
+      chkWarehouse: document.getElementById('chk-warehouse'),
+      btnBase: document.getElementById('btn-base'),
+      btnOptimal: document.getElementById('btn-optimal'),
+
+      // Etiquetas de controles
+      demandPctLabel: document.getElementById('demand-pct-label'),
+      demandVolLabel: document.getElementById('demand-vol-label'),
+      workersAddLabel: document.getElementById('workers-add-label'),
+      workersTotalLabel: document.getElementById('workers-total-label'),
+
+      // Banner de estado
+      statusBanner: document.getElementById('status-banner'),
+      statusIconWrap: document.getElementById('status-icon-wrap'),
+      statusIcon: document.getElementById('status-icon'),
+      statusBadge: document.getElementById('status-badge'),
+      bottleneckName: document.getElementById('bottleneck-name'),
+      statusTitle: document.getElementById('status-title'),
+      statusSubtitle: document.getElementById('status-subtitle'),
+      bannerEffCap: document.getElementById('banner-eff-cap'),
+      bannerDemand: document.getElementById('banner-demand'),
+
+      // Gráficos de barras
+      valPrep: document.getElementById('val-prep'),
+      diffPrep: document.getElementById('diff-prep'),
+      barPrep: document.getElementById('bar-prep'),
+      barPrepLabel: document.getElementById('bar-prep-label'),
+      tagPrep: document.getElementById('tag-prep'),
+      formulaPrep: document.getElementById('formula-prep'),
+
+      valPack: document.getElementById('val-pack'),
+      diffPack: document.getElementById('diff-pack'),
+      barPack: document.getElementById('bar-pack'),
+      barPackLabel: document.getElementById('bar-pack-label'),
+      tagPack: document.getElementById('tag-pack'),
+      formulaPack: document.getElementById('formula-pack'),
+
+      valShip: document.getElementById('val-ship'),
+      diffShip: document.getElementById('diff-ship'),
+      barShip: document.getElementById('bar-ship'),
+      barShipLabel: document.getElementById('bar-ship-label'),
+      tagShip: document.getElementById('tag-ship'),
+      formulaShip: document.getElementById('formula-ship'),
+
+      demandRefTexts: document.querySelectorAll('.demand-ref-text'),
+      refLine1: document.getElementById('ref-line-1'),
+      refLine2: document.getElementById('ref-line-2'),
+      refLine3: document.getElementById('ref-line-3'),
+
+      // KPIs financieros
+      kpiMonthlyCost: document.getElementById('kpi-monthly-cost'),
+      kpiCostBreakdown: document.getElementById('kpi-cost-breakdown'),
+      kpiCostPerTotalOrder: document.getElementById('kpi-cost-per-total-order'),
+      kpiCostPerExtraOrder: document.getElementById('kpi-cost-per-extra-order'),
+      monthlyTotalOrdersText: document.getElementById('monthly-total-orders-text'),
+      monthlyExtraOrdersText: document.getElementById('monthly-extra-orders-text')
+    };
+
+    // Formateadores numéricos en español
+    const fmtInt = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
+    const fmtDec1 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const fmtCurrency = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+    const fmtCurrencyDec = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    /**
+     * Ejecuta el cálculo completo del modelo matemático y actualiza la interfaz
+     */
+    function updateSimulation() {
+      // 1. Leer entradas del usuario
+      const demandGrowthPct = parseInt(dom.sliderDemand.value, 10);
+      const extraWorkers = parseInt(dom.sliderWorkers.value, 10);
+      const hasTech = dom.chkTech.checked;
+      const hasExpansion = dom.chkExpansion.checked;
+      const hasWarehouse = dom.chkWarehouse.checked;
+
+      // 2. Cálculos operativos
+      const targetDemand = Math.round(MODEL_CONSTANTS.BASE_DEMAND * (1 + demandGrowthPct / 100));
+      const totalWorkers = MODEL_CONSTANTS.BASE_WORKERS + extraWorkers;
+      const productivityPerHour = MODEL_CONSTANTS.BASE_PRODUCTIVITY_PER_HOUR * (hasTech ? MODEL_CONSTANTS.TECH_MULTIPLIER : 1);
+      const dailyOrdersPerWorker = productivityPerHour * MODEL_CONSTANTS.HOURS_PER_DAY;
+      const warehouseBonus = hasWarehouse ? MODEL_CONSTANTS.SECOND_WAREHOUSE_CAP : 0;
+
+      // Capacidades por etapa
+      const capPrep = Math.round(totalWorkers * dailyOrdersPerWorker + warehouseBonus);
+      const capPack = (hasExpansion ? MODEL_CONSTANTS.EXPANDED_PACKING_CAP : MODEL_CONSTANTS.BASE_PACKING_CAP) + warehouseBonus;
+      const capShip = (hasExpansion ? MODEL_CONSTANTS.EXPANDED_SHIPPING_CAP : MODEL_CONSTANTS.BASE_SHIPPING_CAP) + warehouseBonus;
+
+      // Capacidad efectiva (mínimo secuencial)
+      const effectiveCap = Math.min(capPrep, capPack, capShip);
+      const systemBalance = effectiveCap - targetDemand;
+      const isSufficient = effectiveCap >= targetDemand;
+
+      // Identificar cuello(s) de botella activos
+      const bottlenecks = [];
+      if (capPrep === effectiveCap) bottlenecks.push('Preparación');
+      if (capPack === effectiveCap) bottlenecks.push('Empaquetado');
+      if (capShip === effectiveCap) bottlenecks.push('Expedición');
+      const bottleneckLabel = bottlenecks.join(' y ');
+
+      // 3. Cálculos financieros
+      const workersCost = extraWorkers * MODEL_CONSTANTS.COST_PER_WORKER;
+      const techCost = hasTech ? MODEL_CONSTANTS.COST_TECH : 0;
+      const expansionCost = hasExpansion ? MODEL_CONSTANTS.COST_EXPANSION : 0;
+      const warehouseCost = hasWarehouse ? MODEL_CONSTANTS.COST_SECOND_WAREHOUSE : 0;
+      const totalAdditionalMonthlyCost = workersCost + techCost + expansionCost + warehouseCost;
+
+      const monthlyTotalOrders = targetDemand * MODEL_CONSTANTS.DAYS_PER_MONTH;
+      const dailyExtraOrders = Math.max(0, targetDemand - MODEL_CONSTANTS.BASE_DEMAND);
+      const monthlyExtraOrders = dailyExtraOrders * MODEL_CONSTANTS.DAYS_PER_MONTH;
+
+      const costPerTotalOrder = monthlyTotalOrders > 0 ? totalAdditionalMonthlyCost / monthlyTotalOrders : 0;
+      const costPerExtraOrder = monthlyExtraOrders > 0 ? totalAdditionalMonthlyCost / monthlyExtraOrders : null;
+
+      // 4. Actualizar etiquetas de controles
+      dom.demandPctLabel.textContent = `+${demandGrowthPct}%`;
+      dom.demandVolLabel.textContent = `${fmtInt.format(targetDemand)} ped/día`;
+      dom.workersAddLabel.textContent = `+${extraWorkers} op.`;
+      dom.workersTotalLabel.textContent = `Total: ${totalWorkers}`;
+
+      // 5. Actualizar Banner de Alerta y Estado
+      dom.bottleneckName.textContent = bottleneckLabel;
+      dom.bannerEffCap.innerHTML = `${fmtInt.format(effectiveCap)} <span class="text-xs font-normal text-slate-500">ped/día</span>`;
+      dom.bannerDemand.innerHTML = `${fmtInt.format(targetDemand)} <span class="text-xs font-normal text-slate-500">ped/día</span>`;
+
+      if (isSufficient) {
+        dom.statusBanner.className = 'rounded-2xl border p-4 sm:p-5 shadow-sm transition-colors duration-300 bg-emerald-50 border-emerald-200';
+        dom.statusIconWrap.className = 'w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-emerald-600 text-white shadow-sm';
+        dom.statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />';
+        dom.statusBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-600 text-white';
+        dom.statusBadge.textContent = 'Capacidad Suficiente';
+        dom.statusTitle.textContent = `El sistema cubre la demanda objetivo de ${fmtInt.format(targetDemand)} ped/día con holgura operativa.`;
+        dom.statusSubtitle.innerHTML = `Capacidad efectiva del sistema: <strong>${fmtInt.format(effectiveCap)} ped/día</strong> (superávit de <strong class="text-emerald-700">+${fmtInt.format(systemBalance)} ped/día</strong>).`;
+      } else {
+        dom.statusBanner.className = 'rounded-2xl border p-4 sm:p-5 shadow-sm transition-colors duration-300 bg-rose-50 border-rose-200';
+        dom.statusIconWrap.className = 'w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-rose-600 text-white shadow-sm';
+        dom.statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />';
+        dom.statusBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-600 text-white';
+        dom.statusBadge.textContent = 'Déficit de Capacidad';
+        dom.statusTitle.textContent = `Alerta: Cuello de botella en ${bottleneckLabel} impide cubrir los ${fmtInt.format(targetDemand)} ped/día.`;
+        dom.statusSubtitle.innerHTML = `Capacidad efectiva limitada a <strong>${fmtInt.format(effectiveCap)} ped/día</strong> (déficit de <strong class="text-rose-700">${fmtInt.format(systemBalance)} ped/día</strong> sin atender).`;
+      }
+
+      // 6. Actualizar Gráficos de Barras
+      dom.demandRefTexts.forEach(el => {
+        el.textContent = fmtInt.format(targetDemand);
+      });
+
+      const maxScale = Math.max(MODEL_CONSTANTS.CHART_MAX_SCALE, targetDemand * 1.1, capPrep * 1.05, capPack * 1.05, capShip * 1.05);
+      const refLinePct = Math.min(99, (targetDemand / maxScale) * 100);
+      dom.refLine1.style.left = `${refLinePct}%`;
+      dom.refLine2.style.left = `${refLinePct}%`;
+      dom.refLine3.style.left = `${refLinePct}%`;
+
+      updateProcessBar({
+        cap: capPrep,
+        demand: targetDemand,
+        isBottleneck: capPrep === effectiveCap,
+        maxScale,
+        valEl: dom.valPrep,
+        diffEl: dom.diffPrep,
+        barEl: dom.barPrep,
+        barLabelEl: dom.barPrepLabel,
+        tagEl: dom.tagPrep
+      });
+
+      updateProcessBar({
+        cap: capPack,
+        demand: targetDemand,
+        isBottleneck: capPack === effectiveCap,
+        maxScale,
+        valEl: dom.valPack,
+        diffEl: dom.diffPack,
+        barEl: dom.barPack,
+        barLabelEl: dom.barPackLabel,
+        tagEl: dom.tagPack
+      });
+
+      updateProcessBar({
+        cap: capShip,
+        demand: targetDemand,
+        isBottleneck: capShip === effectiveCap,
+        maxScale,
+        valEl: dom.valShip,
+        diffEl: dom.diffShip,
+        barEl: dom.barShip,
+        barLabelEl: dom.barShipLabel,
+        tagEl: dom.tagShip
+      });
+
+      // Fórmulas descriptivas bajo cada barra
+      dom.formulaPrep.textContent = `${totalWorkers} operarios × ${fmtDec1.format(productivityPerHour)} ped/h × 7 h/día${hasWarehouse ? ' + 3.500 (2º almacén)' : ''} = ${fmtInt.format(capPrep)} ped/día`;
+      dom.formulaPack.textContent = `${hasExpansion ? 'Nave ampliada (10.000)' : 'Capacidad base (7.000)'}${hasWarehouse ? ' + 3.500 (2º almacén)' : ''} = ${fmtInt.format(capPack)} ped/día`;
+      dom.formulaShip.textContent = `${hasExpansion ? 'Muelles ampliados (10.000)' : 'Capacidad base (8.000)'}${hasWarehouse ? ' + 3.500 (2º almacén)' : ''} = ${fmtInt.format(capShip)} ped/día`;
+
+      // 7. Actualizar Tarjetas Financieras
+      dom.kpiMonthlyCost.textContent = fmtCurrency.format(totalAdditionalMonthlyCost);
+      dom.kpiCostPerTotalOrder.textContent = fmtCurrencyDec.format(costPerTotalOrder);
+      dom.monthlyTotalOrdersText.textContent = fmtInt.format(monthlyTotalOrders);
+      dom.monthlyExtraOrdersText.textContent = fmtInt.format(monthlyExtraOrders);
+
+      if (costPerExtraOrder !== null) {
+        dom.kpiCostPerExtraOrder.textContent = fmtCurrencyDec.format(costPerExtraOrder);
+      } else {
+        dom.kpiCostPerExtraOrder.textContent = 'N/A (0% crecim.)';
+      }
+
+      // Desglose de costes activos
+      const breakdownItems = [];
+      if (extraWorkers > 0) breakdownItems.push(`• ${extraWorkers} operarios: <strong>${fmtCurrency.format(workersCost)}</strong>`);
+      if (hasTech) breakdownItems.push(`• Tecnología (+30%): <strong>${fmtCurrency.format(techCost)}</strong>`);
+      if (hasExpansion) breakdownItems.push(`• Ampliación nave: <strong>${fmtCurrency.format(expansionCost)}</strong>`);
+      if (hasWarehouse) breakdownItems.push(`• Segundo almacén: <strong>${fmtCurrency.format(warehouseCost)}</strong>`);
+
+      dom.kpiCostBreakdown.innerHTML = breakdownItems.length > 0
+        ? breakdownItems.join('<br/>')
+        : 'Sin costes adicionales sobre la operación base.';
+    }
+
+    /**
+     * Actualiza el aspecto visual, color y etiquetas de una barra de proceso
+     */
+    function updateProcessBar({ cap, demand, isBottleneck, maxScale, valEl, diffEl, barEl, barLabelEl, tagEl }) {
+      const diff = cap - demand;
+      const pctWidth = Math.min(100, Math.max(8, (cap / maxScale) * 100));
+
+      valEl.textContent = fmtInt.format(cap);
+      barLabelEl.textContent = fmtInt.format(cap);
+      barEl.style.width = `${pctWidth}%`;
+
+      if (diff >= 0) {
+        diffEl.textContent = `(+${fmtInt.format(diff)})`;
+        diffEl.className = 'ml-1 text-xs font-bold text-emerald-600';
+      } else {
+        diffEl.textContent = `(${fmtInt.format(diff)})`;
+        diffEl.className = 'ml-1 text-xs font-bold text-rose-600';
+      }
+
+      // Código de color: Rojo si déficit, Ámbar si es cuello de botella pero cubre, Verde si cubre holgadamente
+      if (cap < demand) {
+        barEl.className = 'bar-transition h-full bg-rose-500 rounded-r-lg flex items-center px-3 text-xs font-bold text-white';
+        tagEl.className = 'inline-block px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide bg-rose-100 text-rose-800';
+        tagEl.textContent = isBottleneck ? 'Cuello de Botella · Déficit' : 'Insuficiente';
+      } else if (isBottleneck) {
+        barEl.className = 'bar-transition h-full bg-amber-500 rounded-r-lg flex items-center px-3 text-xs font-bold text-white';
+        tagEl.className = 'inline-block px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800';
+        tagEl.textContent = 'Cuello de Botella Activo';
+      } else {
+        barEl.className = 'bar-transition h-full bg-emerald-500 rounded-r-lg flex items-center px-3 text-xs font-bold text-white';
+        tagEl.className = 'hidden';
+      }
+    }
+
+    // Event Listeners para todos los controles
+    dom.sliderDemand.addEventListener('input', updateSimulation);
+    dom.sliderWorkers.addEventListener('input', updateSimulation);
+    dom.chkTech.addEventListener('change', updateSimulation);
+    dom.chkExpansion.addEventListener('change', updateSimulation);
+    dom.chkWarehouse.addEventListener('change', updateSimulation);
+
+    // Preset 1: Restaurar escenario base
+    dom.btnBase.addEventListener('click', () => {
+      dom.sliderDemand.value = 0;
+      dom.sliderWorkers.value = 0;
+      dom.chkTech.checked = false;
+      dom.chkExpansion.checked = false;
+      dom.chkWarehouse.checked = false;
+      updateSimulation();
+    });
+
+    // Preset 2: Cargar escenario óptimo recomendado (+50% demanda = 9.000 ped/día, +6 operarios, Tecnología + Ampliación)
+    dom.btnOptimal.addEventListener('click', () => {
+      dom.sliderDemand.value = 50;
+      dom.sliderWorkers.value = 6;
+      dom.chkTech.checked = true;
+      dom.chkExpansion.checked = true;
+      dom.chkWarehouse.checked = false;
+      updateSimulation();
+    });
+
+    // Inicializar al cargar la página
+    window.addEventListener('DOMContentLoaded', updateSimulation);
+  </script>
+</body>
+</html>
